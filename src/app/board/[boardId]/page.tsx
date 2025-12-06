@@ -9,7 +9,6 @@ import { useAuth, useUser, useStorage } from '@/firebase/provider';
 import { useBoardStore } from '@/lib/store/boardStore';
 import { useBoardState } from '@/hooks/use-board-state';
 import { useElementManager } from '@/hooks/use-element-manager';
-import { useUserPreferences } from '@/hooks/use-user-preferences';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { useToast } from '@/hooks/use-toast';
 
@@ -153,9 +152,7 @@ export default function BoardPage({ params }: BoardPageProps) {
   const [isInfoPanelVisible, setIsInfoPanelVisible] = useState(false); // Oculto por defecto, se muestra al seleccionar elemento
 
   // -- DICTADO DE VOZ --
-  const { micPermission } = useUserPreferences();
-  
-  // Hook de dictado SENIOR - Versión mejorada con manejo de permisos
+  // Hook de dictado simplificado según Readme 18 Nov
   const {
     isSupported: isDictationSupported,
     isListening: isDictationListening,
@@ -164,7 +161,6 @@ export default function BoardPage({ params }: BoardPageProps) {
     interimTranscript,
     permissionError,
     toggle: toggleDictation,
-    requestPermission,
   } = useDictation();
   
   // liveTranscript combina finalTranscript + interimTranscript para mostrar en tiempo real
@@ -583,18 +579,23 @@ export default function BoardPage({ params }: BoardPageProps) {
       const viewportHeight = window.innerHeight;
       const scale = 4; // Alta resolución para tablero completo (NO reducir)
       
+      // Obtener el rectángulo del contenedor para calcular la posición relativa
+      const containerRect = canvasContainer.getBoundingClientRect();
+      
       const canvas = await html2canvas(canvasContainer, {
         backgroundColor: '#96e4e6',
         scale: scale,
         useCORS: true,
         logging: false,
         allowTaint: false,
-        x: scrollLeft,
-        y: scrollTop,
+        scrollX: -scrollLeft,
+        scrollY: -scrollTop,
         width: viewportWidth,
         height: viewportHeight,
         windowWidth: viewportWidth,
         windowHeight: viewportHeight,
+        x: containerRect.left + scrollLeft,
+        y: containerRect.top + scrollTop,
       });
 
       // Restaurar elementos de UI

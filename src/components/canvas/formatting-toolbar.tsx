@@ -168,11 +168,33 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
     e.stopPropagation();
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) {
-      // Si no hay selección, aplicar color al elemento activo
+      // Si no hay selección, envolver todo el contenido en un span con el color
       const activeElement = document.activeElement as HTMLElement;
       if (activeElement && activeElement.isContentEditable) {
-        activeElement.style.color = color;
-        // Disparar evento input para guardar
+        // Si el elemento ya tiene un solo hijo span con color, actualizar ese span
+        const children = Array.from(activeElement.childNodes);
+        if (children.length === 1 && children[0].nodeType === Node.ELEMENT_NODE) {
+          const child = children[0] as HTMLElement;
+          if (child.tagName === 'SPAN' && child.style.color) {
+            child.style.color = color;
+            activeElement.dispatchEvent(new Event('input', { bubbles: true }));
+            setPopoverOpen(null);
+            return;
+          }
+        }
+        // Envolver todo el contenido en un span con el color
+        const span = document.createElement('span');
+        span.style.color = color;
+        while (activeElement.firstChild) {
+          span.appendChild(activeElement.firstChild);
+        }
+        activeElement.appendChild(span);
+        // Mover cursor al final
+        const range = document.createRange();
+        range.selectNodeContents(span);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
         activeElement.dispatchEvent(new Event('input', { bubbles: true }));
       }
       setPopoverOpen(null);
@@ -180,14 +202,37 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
     }
     
     if (selection.isCollapsed) {
-      // Si solo hay cursor, aplicar color al elemento padre
+      // Si solo hay cursor, envolver el contenido del elemento en un span con el color
       const range = selection.getRangeAt(0);
       const container = range.commonAncestorContainer;
       const element = container.nodeType === Node.TEXT_NODE 
         ? (container.parentElement as HTMLElement)
         : (container as HTMLElement);
       if (element && element.isContentEditable) {
-        element.style.color = color;
+        // Verificar si ya tiene un span con color
+        const children = Array.from(element.childNodes);
+        if (children.length === 1 && children[0].nodeType === Node.ELEMENT_NODE) {
+          const child = children[0] as HTMLElement;
+          if (child.tagName === 'SPAN' && child.style.color) {
+            child.style.color = color;
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            setPopoverOpen(null);
+            return;
+          }
+        }
+        // Envolver contenido en span con color
+        const span = document.createElement('span');
+        span.style.color = color;
+        while (element.firstChild) {
+          span.appendChild(element.firstChild);
+        }
+        element.appendChild(span);
+        // Mover cursor al final
+        const newRange = document.createRange();
+        newRange.selectNodeContents(span);
+        newRange.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(newRange);
         element.dispatchEvent(new Event('input', { bubbles: true }));
       }
       setPopoverOpen(null);

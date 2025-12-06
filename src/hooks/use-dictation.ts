@@ -1,14 +1,13 @@
 /**
- * Hook de Dictado - Versión SENIOR 2024
- * Código probado y sin errores, compatible con React y Firebase
- * Implementa mejores prácticas modernas para Web Speech API
- * Manejo robusto de permisos y errores
+ * Hook de Dictado - Versión Simplificada según Readme 18 Nov
+ * Implementación simple y directa: clic en Mic -> hablar -> clic en Mic para detener
+ * Compatible con React y Firebase
  */
 
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { addIntelligentPunctuation, formatFinalText, formatInterimText } from '@/lib/text-processor';
+import { formatFinalText, formatInterimText } from '@/lib/text-processor';
 
 interface UseDictationReturn {
   isSupported: boolean;
@@ -21,7 +20,6 @@ interface UseDictationReturn {
   stop: () => void;
   toggle: () => Promise<void>;
   resetTranscript: () => void;
-  requestPermission: () => Promise<boolean>;
 }
 
 // Verificar soporte del navegador
@@ -35,21 +33,6 @@ const getSpeechRecognition = (): typeof SpeechRecognition | null => {
   return SpeechRecognition || null;
 };
 
-// Verificar permisos del micrófono usando Permissions API (si está disponible)
-const checkMicrophonePermission = async (): Promise<PermissionState | null> => {
-  if (typeof navigator === 'undefined' || !navigator.permissions) {
-    return null; // Permissions API no disponible
-  }
-
-  try {
-    const result = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-    return result.state;
-  } catch (error) {
-    // Algunos navegadores no soportan 'microphone' como nombre de permiso
-    return null;
-  }
-};
-
 export const useDictation = (): UseDictationReturn => {
   const [isListening, setIsListening] = useState(false);
   const [finalTranscript, setFinalTranscript] = useState('');
@@ -60,15 +43,17 @@ export const useDictation = (): UseDictationReturn => {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const accumulatedFinalRef = useRef<string>('');
   const isManualStopRef = useRef<boolean>(false);
-  const restartTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // CRÍTICO: Refs para leer valores actuales sin causar re-renders
   const isListeningRef = useRef<boolean>(false);
-  const permissionRequestedRef = useRef<boolean>(false);
-  const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Constante: 3 minutos en milisegundos
-  const INACTIVITY_TIMEOUT_MS = 3 * 60 * 1000; // 180,000 ms
+  const permissionErrorRef = useRef<string | null>(null);
 
-  // Inicializar reconocimiento de voz
+  // Sincronizar refs con state
+  useEffect(() => {
+    isListeningRef.current = isListening;
+    permissionErrorRef.current = permissionError;
+  }, [isListening, permissionError]);
+
+  // Inicializar reconocimiento de voz (SOLO UNA VEZ)
   useEffect(() => {
     const SpeechRecognition = getSpeechRecognition();
     
@@ -85,49 +70,14 @@ export const useDictation = (): UseDictationReturn => {
     recognition.interimResults = true;
     recognition.lang = 'es-MX'; // Español latinoamericano
 
-    // Función helper para resetear timeout de inactividad
-    const resetInactivityTimeout = () => {
-      // Limpiar timeout anterior si existe
-      if (inactivityTimeoutRef.current) {
-        clearTimeout(inactivityTimeoutRef.current);
-        inactivityTimeoutRef.current = null;
-      }
-      
-      // Solo crear timeout si está escuchando y no fue detenido manualmente
-      if (isListeningRef.current && !isManualStopRef.current) {
-        inactivityTimeoutRef.current = setTimeout(() => {
-          console.log('⏱️ Dictado detenido automáticamente por inactividad (3 minutos)');
-          // Detener automáticamente después de 3 minutos sin actividad
-          isManualStopRef.current = true;
-          if (recognitionRef.current) {
-            try {
-              recognitionRef.current.stop();
-            } catch (error) {
-              console.error('Error al detener por inactividad:', error);
-            }
-          }
-          isListeningRef.current = false;
-          setIsListening(false);
-          
-          // Limpiar timeout de reinicio si existe
-          if (restartTimeoutRef.current) {
-            clearTimeout(restartTimeoutRef.current);
-            restartTimeoutRef.current = null;
-          }
-        }, INACTIVITY_TIMEOUT_MS);
-      }
-    };
-
     // Evento: Inicio de reconocimiento
     recognition.onstart = () => {
-      console.log('🎤 Reconocimiento de voz iniciado');
+      console.log('🎤 Dictado iniciado');
+      isManualStopRef.current = false;
       isListeningRef.current = true;
       setIsListening(true);
-      isManualStopRef.current = false;
-      setPermissionError(null); // Limpiar error de permisos al iniciar exitosamente
-      
-      // Iniciar timeout de inactividad (3 minutos)
-      resetInactivityTimeout();
+      setPermissionError(null);
+      permissionErrorRef.current = null;
     };
 
     // Evento: Resultados del reconocimiento
@@ -156,13 +106,9 @@ export const useDictation = (): UseDictationReturn => {
         const processed = formatInterimText(interim);
         setInterimTranscript(processed);
       }
-      
-      // CRÍTICO: Resetear timeout de inactividad cada vez que hay actividad
-      // Esto significa que el dictado se mantendrá activo mientras haya resultados
-      resetInactivityTimeout();
     };
 
-    // Evento: Error en reconocimiento - MANEJO MEJORADO
+    // Evento: Error en reconocimiento
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.error('Error en reconocimiento de voz:', event.error);
       
@@ -171,18 +117,14 @@ export const useDictation = (): UseDictationReturn => {
         return;
       }
 
-      // Error de permisos - CRÍTICO
+      // Error de permisos
       if (event.error === 'not-allowed') {
         isListeningRef.current = false;
         setIsListening(false);
         isManualStopRef.current = false;
-        setPermissionError('Permiso de micrófono denegado. Por favor, permite el acceso al micrófono en la configuración de tu navegador.');
-        
-        // Limpiar timeout de reinicio
-        if (restartTimeoutRef.current) {
-          clearTimeout(restartTimeoutRef.current);
-          restartTimeoutRef.current = null;
-        }
+        const errorMsg = 'Permiso de micrófono denegado. Por favor, permite el acceso al micrófono en la configuración de tu navegador.';
+        setPermissionError(errorMsg);
+        permissionErrorRef.current = errorMsg;
         return;
       }
 
@@ -191,77 +133,57 @@ export const useDictation = (): UseDictationReturn => {
         isListeningRef.current = false;
         setIsListening(false);
         isManualStopRef.current = false;
-        setPermissionError('Error de red. Verifica tu conexión a internet.');
+        const errorMsg = 'Error de red. Verifica tu conexión a internet.';
+        setPermissionError(errorMsg);
+        permissionErrorRef.current = errorMsg;
         return;
       }
 
-      // Error desconocido
       if (event.error === 'audio-capture') {
         isListeningRef.current = false;
         setIsListening(false);
-        setPermissionError('No se detectó ningún micrófono. Verifica que tu micrófono esté conectado y funcionando.');
+        const errorMsg = 'No se detectó ningún micrófono. Verifica que tu micrófono esté conectado y funcionando.';
+        setPermissionError(errorMsg);
+        permissionErrorRef.current = errorMsg;
         return;
       }
     };
 
     // Evento: Fin de reconocimiento
     recognition.onend = () => {
-      console.log('🎤 Reconocimiento de voz finalizado');
+      console.log('🎤 Dictado finalizado');
       
-      // Si fue detenido manualmente o por inactividad, no reiniciar
+      // Si fue detenido manualmente, no reiniciar
       if (isManualStopRef.current) {
-        // Limpiar timeout de inactividad
-        if (inactivityTimeoutRef.current) {
-          clearTimeout(inactivityTimeoutRef.current);
-          inactivityTimeoutRef.current = null;
-        }
         isListeningRef.current = false;
         setIsListening(false);
         return;
       }
       
-      // Solo reiniciar si NO fue detenido manualmente y NO hay error de permisos
-      // y el timeout de inactividad aún está activo (hay actividad reciente)
-      if (isListeningRef.current && !permissionError && inactivityTimeoutRef.current) {
-        restartTimeoutRef.current = setTimeout(() => {
-          if (!isManualStopRef.current && recognitionRef.current && isListeningRef.current && !permissionError && inactivityTimeoutRef.current) {
+      // Reiniciar automáticamente si no fue detenido manualmente (escucha continua)
+      // CRÍTICO: Usar refs para leer valores actuales sin causar re-renders
+      if (isListeningRef.current && !permissionErrorRef.current) {
+        setTimeout(() => {
+          if (!isManualStopRef.current && recognitionRef.current && isListeningRef.current && !permissionErrorRef.current) {
             try {
               recognitionRef.current.start();
             } catch (error) {
               console.error('Error al reiniciar reconocimiento:', error);
               isListeningRef.current = false;
               setIsListening(false);
-              // Limpiar timeout de inactividad
-              if (inactivityTimeoutRef.current) {
-                clearTimeout(inactivityTimeoutRef.current);
-                inactivityTimeoutRef.current = null;
-              }
             }
           }
         }, 100);
       } else {
-        // Si no hay timeout de inactividad, significa que se detuvo por inactividad
         isListeningRef.current = false;
         setIsListening(false);
-        if (inactivityTimeoutRef.current) {
-          clearTimeout(inactivityTimeoutRef.current);
-          inactivityTimeoutRef.current = null;
-        }
       }
     };
 
     recognitionRef.current = recognition;
 
-    recognitionRef.current = recognition;
-
     // Limpieza
     return () => {
-      if (restartTimeoutRef.current) {
-        clearTimeout(restartTimeoutRef.current);
-      }
-      if (inactivityTimeoutRef.current) {
-        clearTimeout(inactivityTimeoutRef.current);
-      }
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
@@ -271,40 +193,9 @@ export const useDictation = (): UseDictationReturn => {
         recognitionRef.current = null;
       }
     };
-  }, [permissionError]);
+  }, []); // CRÍTICO: Sin dependencias - solo inicializar una vez
 
-  // Función para solicitar permisos (mejor práctica: solicitar después de acción del usuario)
-  const requestPermission = useCallback(async (): Promise<boolean> => {
-    if (!isSupported || !recognitionRef.current) {
-      return false;
-    }
-
-    try {
-      // Verificar permisos usando Permissions API si está disponible
-      const permissionState = await checkMicrophonePermission();
-      
-      if (permissionState === 'denied') {
-        setPermissionError('Permiso de micrófono denegado. Por favor, permite el acceso al micrófono en la configuración de tu navegador.');
-        return false;
-      }
-
-      if (permissionState === 'granted') {
-        setPermissionError(null);
-        return true;
-      }
-
-      // Si el permiso no está determinado, intentar iniciar (esto solicitará permiso)
-      // NOTA: En algunos navegadores, el permiso se solicita automáticamente al llamar start()
-      permissionRequestedRef.current = true;
-      return true;
-    } catch (error) {
-      console.error('Error verificando permisos:', error);
-      // Continuar de todas formas, el navegador solicitará permiso al iniciar
-      return true;
-    }
-  }, [isSupported]);
-
-  // Función para iniciar reconocimiento - MEJORADA con manejo de permisos
+  // Función para iniciar reconocimiento
   const start = useCallback(async () => {
     if (!isSupported || !recognitionRef.current) {
       console.warn('Reconocimiento de voz no disponible');
@@ -316,24 +207,15 @@ export const useDictation = (): UseDictationReturn => {
       return;
     }
 
-    // Si hay un error de permisos previo, intentar solicitar de nuevo
-    if (permissionError) {
-      const hasPermission = await requestPermission();
-      if (!hasPermission) {
-        return;
-      }
-    }
-
     try {
-      // Resetear flags
+      // Resetear flags y estado
       isManualStopRef.current = false;
       accumulatedFinalRef.current = '';
       setFinalTranscript('');
       setInterimTranscript('');
       setPermissionError(null);
-      isListeningRef.current = true;
       
-      // Iniciar reconocimiento (esto puede solicitar permisos automáticamente)
+      // Iniciar reconocimiento
       recognitionRef.current.start();
     } catch (error: any) {
       console.error('Error al iniciar reconocimiento:', error);
@@ -341,7 +223,6 @@ export const useDictation = (): UseDictationReturn => {
       // Manejar error de permisos
       if (error.name === 'NotAllowedError' || error.message?.includes('not-allowed')) {
         setPermissionError('Permiso de micrófono denegado. Por favor, permite el acceso al micrófono en la configuración de tu navegador.');
-        isListeningRef.current = false;
         setIsListening(false);
         return;
       }
@@ -349,7 +230,7 @@ export const useDictation = (): UseDictationReturn => {
       // Si el error es que ya está corriendo, intentar detener y reiniciar
       if (error.message?.includes('already started') || error.name === 'InvalidStateError') {
         try {
-          recognitionRef.current.stop();
+          recognitionRef.current?.stop();
           setTimeout(() => {
             if (recognitionRef.current) {
               recognitionRef.current.start();
@@ -357,41 +238,26 @@ export const useDictation = (): UseDictationReturn => {
           }, 100);
         } catch (retryError) {
           console.error('Error al reiniciar:', retryError);
-          isListeningRef.current = false;
           setIsListening(false);
         }
       } else {
-        isListeningRef.current = false;
         setIsListening(false);
       }
     }
-  }, [isSupported, isListening, permissionError, requestPermission]);
+  }, [isSupported, isListening]);
 
   // Función para detener reconocimiento
   const stop = useCallback(() => {
     if (!recognitionRef.current) return;
 
     isManualStopRef.current = true;
-    
-    // Limpiar todos los timeouts
-    if (restartTimeoutRef.current) {
-      clearTimeout(restartTimeoutRef.current);
-      restartTimeoutRef.current = null;
-    }
-    
-    if (inactivityTimeoutRef.current) {
-      clearTimeout(inactivityTimeoutRef.current);
-      inactivityTimeoutRef.current = null;
-    }
 
     try {
       recognitionRef.current.stop();
-      isListeningRef.current = false;
       setIsListening(false);
-      console.log('🎤 Reconocimiento detenido por el usuario');
+      console.log('🎤 Dictado detenido por el usuario');
     } catch (error) {
       console.error('Error al detener reconocimiento:', error);
-      isListeningRef.current = false;
       setIsListening(false);
     }
   }, []);
@@ -426,6 +292,5 @@ export const useDictation = (): UseDictationReturn => {
     stop,
     toggle,
     resetTranscript,
-    requestPermission,
   };
 };

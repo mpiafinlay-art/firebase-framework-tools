@@ -44,6 +44,8 @@ export default function TabbedNotepadElement(props: CommonElementProps) {
   const titleInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const textareaRefs = useRef<{ [key: string]: HTMLTextAreaElement | null }>({});
+  // Estado local para preservar el cursor en textareas
+  const [localTabContent, setLocalTabContent] = useState<{ [key: string]: string }>({});
 
   const activeTabId = tabbedContent.activeTabId || tabbedContent.tabs[0]?.id || 'tab-1';
   const activeTab = tabbedContent.tabs.find((tab: TabbedNotepadTab) => tab.id === activeTabId) || tabbedContent.tabs[0];
@@ -120,6 +122,9 @@ export default function TabbedNotepadElement(props: CommonElementProps) {
 
   // Actualizar contenido de pestaña
   const handleTabContentChange = useCallback((tabId: string, newContent: string) => {
+    // Actualizar estado local inmediatamente
+    setLocalTabContent(prev => ({ ...prev, [tabId]: newContent }));
+    
     const updatedContent: TabbedNotepadContent = {
       ...tabbedContent,
       tabs: tabbedContent.tabs.map((tab: TabbedNotepadTab) =>
@@ -128,6 +133,38 @@ export default function TabbedNotepadElement(props: CommonElementProps) {
     };
     onUpdate(id, { content: updatedContent });
   }, [id, tabbedContent, onUpdate]);
+  
+  // Sincronizar estado local con props cuando cambia el contenido externo
+  useEffect(() => {
+    const newLocalContent: { [key: string]: string } = {};
+    tabbedContent.tabs.forEach((tab: TabbedNotepadTab) => {
+      const textarea = textareaRefs.current[tab.id];
+      // Solo actualizar si el textarea NO está enfocado (para preservar cursor)
+      if (textarea && document.activeElement !== textarea) {
+        // Solo actualizar si el contenido cambió externamente (no desde onChange)
+        const currentLocal = localTabContent[tab.id];
+        if (currentLocal !== tab.content) {
+          newLocalContent[tab.id] = tab.content;
+        } else {
+          newLocalContent[tab.id] = currentLocal ?? tab.content;
+        }
+      } else {
+        // Mantener el valor local si está enfocado
+        newLocalContent[tab.id] = localTabContent[tab.id] ?? tab.content;
+      }
+    });
+    // Solo actualizar si hay cambios
+    const hasChanges = Object.keys(newLocalContent).some(
+      key => newLocalContent[key] !== localTabContent[key]
+    );
+    if (hasChanges || Object.keys(localTabContent).length === 0) {
+      setLocalTabContent(newLocalContent);
+    }
+  }, [
+    // Dependencia estable: crear string único basado en contenido para evitar re-renders innecesarios
+    tabbedContent.tabs.map(t => `${t.id}|${t.content}`).join('||'),
+    tabbedContent.tabs.length
+  ]);
 
   // Exportar a PNG
   const handleExportToPng = useCallback(async () => {
@@ -391,28 +428,39 @@ export default function TabbedNotepadElement(props: CommonElementProps) {
             </Button>
           </div>
 
-          {tabbedContent.tabs.map((tab) => (
-            <TabsContent
-              key={tab.id}
-              value={tab.id}
-              className="flex-1 overflow-hidden mt-0"
-            >
-              <textarea
-                ref={(el) => {
-                  textareaRefs.current[tab.id] = el;
-                }}
-                value={tab.content}
-                onChange={(e) => {
-                  handleTabContentChange(tab.id, e.target.value);
-                }}
-                className="w-full h-full resize-none border-none outline-none bg-transparent p-2 text-sm"
-                placeholder="Escribe aquí..."
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-                style={{ minHeight: '200px' }}
-              />
-            </TabsContent>
-          ))}
+          {tabbedContent.tabs.map((tab) => {
+            // Usar estado local si existe, sino usar el valor del prop
+            const textareaValue = localTabContent[tab.id] !== undefined 
+              ? localTabContent[tab.id] 
+              : tab.content;
+            
+            return (
+              <TabsContent
+                key={tab.id}
+                value={tab.id}
+                className="flex-1 overflow-hidden mt-0"
+              >
+                <textarea
+                  ref={(el) => {
+                    textareaRefs.current[tab.id] = el;
+                    // Inicializar estado local si no existe
+                    if (el && localTabContent[tab.id] === undefined) {
+                      setLocalTabContent(prev => ({ ...prev, [tab.id]: tab.content }));
+                    }
+                  }}
+                  value={textareaValue}
+                  onChange={(e) => {
+                    handleTabContentChange(tab.id, e.target.value);
+                  }}
+                  className="w-full h-full resize-none border-none outline-none bg-transparent p-2 text-sm"
+                  placeholder="Escribe aquí..."
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  style={{ minHeight: '200px' }}
+                />
+              </TabsContent>
+            );
+          })}
         </Tabs>
       </CardContent>
     </Card>
