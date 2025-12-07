@@ -370,6 +370,13 @@ export default function ToolsSidebar(props: ToolsSidebarProps) {
           </DropdownMenu>
 
           <SidebarButton
+            icon={Trash2}
+            label="Borrar Tablero"
+            onClick={onDeleteBoard}
+            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+          />
+
+          <SidebarButton
             icon={Mic}
             label={isListening ? 'Detener' : 'Dictar'}
             onClick={onToggleDictation}

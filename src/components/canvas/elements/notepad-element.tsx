@@ -157,8 +157,26 @@ export default function NotepadElement(props: CommonElementProps) {
 
   // Función de guardado manual (para compatibilidad con código existente)
   const saveContent = useCallback(async () => {
+    if (isPreview || !contentRef.current) return;
+    
+    // CRÍTICO: Guardar el HTML actual directamente ANTES de llamar a forceSave
+    const currentHtml = contentRef.current.innerHTML;
+    const currentContent = typedContentRef.current;
+    const currentPage = currentPageIndexRef.current;
+    const currentPages = currentContent.pages || [''];
+    
+    // Actualizar la página actual con el contenido HTML actual
+    const newPages = [...currentPages];
+    newPages[currentPage] = currentHtml;
+    
+    // Guardar directamente en Firestore (esto es seguro, solo actualiza el contenido)
+    await onUpdate(id, { 
+      content: { ...currentContent, pages: newPages }
+    });
+    
+    // También ejecutar forceSave para mantener sincronización del hook
     await forceSave();
-  }, [forceSave]);
+  }, [forceSave, isPreview, contentRef, typedContentRef, currentPageIndexRef, onUpdate, id]);
 
   // Ref para almacenar el contenido anterior y evitar loops
   const prevPagesRef = useRef<string>('');
@@ -260,55 +278,51 @@ export default function NotepadElement(props: CommonElementProps) {
     }
   }, [isPreview, onUpdate, id, saveContent]);
 
-  const toggleMinimize = useCallback((e: React.MouseEvent) => {
+  const toggleMinimize = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     if (isPreview) return;
     
-    // FIX: Guardar contenido ANTES de minimizar para preservar el texto
-    saveContent();
+    // CRÍTICO: Guardar contenido ANTES de minimizar y ESPERAR
+    await saveContent();
     
-    // Esperar un momento para asegurar que el contenido se guardó
-    setTimeout(() => {
-      const isMinimized = !!minimized;
-      const currentSize = (properties as CanvasElementProperties)?.size || { width: 794, height: 1021 };
-      
-      // Convertir currentSize a valores numéricos para originalSize
-      const currentSizeNumeric = {
-        width: typeof currentSize.width === 'number' ? currentSize.width : parseFloat(String(currentSize.width)) || 794,
-        height: typeof currentSize.height === 'number' ? currentSize.height : parseFloat(String(currentSize.height)) || 1021,
-      };
+    // Esperar un momento adicional para asegurar que Firestore recibió el update
+    await new Promise(resolve => setTimeout(resolve, 150));
+    
+    const isMinimized = !!minimized;
+    const currentSize = (properties as CanvasElementProperties)?.size || { width: 794, height: 1021 };
+    
+    const currentSizeNumeric = {
+      width: typeof currentSize.width === 'number' ? currentSize.width : parseFloat(String(currentSize.width)) || 794,
+      height: typeof currentSize.height === 'number' ? currentSize.height : parseFloat(String(currentSize.height)) || 1021,
+    };
 
-      if (isMinimized) {
-          // Restaurar: recuperar tamaño original y asegurar que el contenido se mantiene
-          const { originalSize, ...restProps } = (properties || {}) as Partial<CanvasElementProperties>;
-          const restoredSize = originalSize || { width: 794, height: 1021 };
-          const newProperties: Partial<CanvasElementProperties> = { 
-            ...restProps, 
-            size: restoredSize 
-          };
-          
-          // FIX: Preservar el contenido al restaurar
-          onUpdate(id, {
-              minimized: false,
-              properties: newProperties,
-              // No tocar el contenido, solo cambiar minimized y properties
-          });
-      } else {
-          // Minimizar: guardar tamaño actual y reducir altura
-          const currentWidth = typeof currentSize.width === 'number' ? currentSize.width : parseFloat(String(currentSize.width)) || 794;
-          onUpdate(id, {
-              minimized: true,
-              properties: { 
-                ...properties, 
-                size: { width: currentWidth, height: 48 }, 
-                originalSize: currentSizeNumeric 
-              },
-              // No tocar el contenido al minimizar
-          });
-      }
-    }, 100); // Pequeño delay para asegurar que saveContent se ejecutó
-  }, [isPreview, minimized, properties, onUpdate, id, saveContent]); // Mantener dependencias necesarias
+    if (isMinimized) {
+      const { originalSize, ...restProps } = (properties || {}) as Partial<CanvasElementProperties>;
+      const restoredSize = originalSize || { width: 794, height: 1021 };
+      const newProperties: Partial<CanvasElementProperties> = { 
+        ...restProps, 
+        size: restoredSize 
+      };
+      
+      onUpdate(id, {
+        minimized: false,
+        properties: newProperties,
+        // CRÍTICO: No tocar el contenido al restaurar
+      });
+    } else {
+      const currentWidth = typeof currentSize.width === 'number' ? currentSize.width : parseFloat(String(currentSize.width)) || 794;
+      onUpdate(id, {
+        minimized: true,
+        properties: { 
+          ...properties, 
+          size: { width: currentWidth, height: 48 }, 
+          originalSize: currentSizeNumeric 
+        },
+        // CRÍTICO: No tocar el contenido al minimizar
+      });
+    }
+  }, [isPreview, minimized, properties, onUpdate, id, saveContent]);
   
   const handleCloseNotepad = useCallback((e: React.MouseEvent) => { 
     e.stopPropagation(); 
@@ -508,7 +522,25 @@ export default function NotepadElement(props: CommonElementProps) {
     }
   }, []);
 
-  const handleRemoveFormat = useCallback((e: React.MouseEvent) => execCommand(e, 'removeFormat'), [execCommand]);
+  const handleRemoveFormat = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isPreview || !contentRef.current) return;
+    
+    const selection = window.getSelection();
+    // CRÍTICO: Solo ejecutar si hay selección válida
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+      return; // No hacer nada si no hay selección
+    }
+    
+    try {
+      execCommand(e, 'removeFormat');
+      // Disparar evento input para activar autoguardado
+      contentRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+    } catch (error) {
+      console.error('Error al limpiar formato:', error);
+    }
+  }, [execCommand, isPreview, contentRef]);
   const handleInsertDate = useCallback((e: React.MouseEvent) => execCommand(e, 'insertHTML', `<span style="color: #a0a1a6;">-- ${format(new Date(), 'dd/MM/yy')} </span>`), [execCommand]);
   
   const handleSelectAllText = useCallback((e: React.MouseEvent) => {

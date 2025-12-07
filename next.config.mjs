@@ -6,8 +6,8 @@ const __dirname = path.dirname(__filename);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Para Firebase Hosting estático, usar 'export' para generar archivos estáticos
-  output: 'export', // Firebase Hosting requiere export estático
+  // Para App Hosting, usar 'standalone' para SSR y API routes
+  output: 'standalone', // App Hosting soporta Node.js y SSR
   // Deshabilitar imágenes optimizadas para compatibilidad
   images: {
     unoptimized: true,

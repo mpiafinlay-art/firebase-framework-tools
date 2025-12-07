@@ -247,7 +247,7 @@ export default function BoardPage({ params }: BoardPageProps) {
     const foundId = foundElement?.id ?? null;
     const currentId = selectedElement?.id ?? null;
     if (foundId !== currentId) {
-      setSelectedElement(foundElement);
+    setSelectedElement(foundElement);
     }
   }, [foundElement?.id, selectedElement?.id]); // ✅ Depender solo de IDs, no de objetos completos
 
@@ -946,8 +946,20 @@ export default function BoardPage({ params }: BoardPageProps) {
         isOpen={isImageUrlDialogOpen}
         onOpenChange={setIsImageUrlDialogOpen}
         onAddImage={async (url) => {
-          await addElement('image', { content: { url }, properties: { size: { width: 300, height: 200 } } });
+          try {
+            await addElement('image', { 
+              content: { url }, 
+              properties: { size: { width: 300, height: 200 } } 
+            });
           setIsImageUrlDialogOpen(false);
+            toast({ title: 'Imagen agregada', description: 'La imagen se ha agregado al lienzo' });
+          } catch (error) {
+            toast({ 
+              variant: 'destructive', 
+              title: 'Error', 
+              description: 'No se pudo agregar la imagen. Verifica que la URL sea válida.' 
+            });
+          }
         }}
       />
 
