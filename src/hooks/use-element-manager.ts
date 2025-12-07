@@ -252,9 +252,10 @@ export function useElementManager(boardId: string, getViewportCenter: () => { x:
     const elementDocRef = doc(firestore, 'users', user.uid, 'canvasBoards', boardId, 'canvasElements', id);
     
     // Limpiar valores undefined (Firestore no los acepta)
-    const cleanUpdates: any = { updatedAt: serverTimestamp() };
+    // CRÍTICO: Evitar usar 'any' - tipar correctamente
+    const cleanUpdates: Partial<CanvasElement> & { updatedAt: any } = { updatedAt: serverTimestamp() };
     Object.keys(updates).forEach(key => {
-      const value = (updates as any)[key];
+      const value = updates[key as keyof typeof updates];
       if (value !== undefined) {
         cleanUpdates[key] = value;
       } else if (key === 'parentId') {

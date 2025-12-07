@@ -1,0 +1,182 @@
+/*!************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[14].oneOf[12].use[2]!./node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[14].oneOf[12].use[3]!./src/components/canvas/elements/notepad-element.css ***!
+  \************************************************************************************************************************************************************************************************************************************************************************************************/
+/* Variables CSS para alineación perfecta - Del super cuaderno */
+:root {
+  --notepad-line-height: 1.5rem; /* 24px - Alineación perfecta */
+  --notepad-page-padding-top: 32px; /* Padding-top del notepad normal */
+  --notepad-background-offset-y: calc(var(--notepad-page-padding-top) + 18px);
+  --notepad-small-padding-top: 16px; /* Padding-top del notepad pequeño */
+  --notepad-small-background-offset-y: calc(var(--notepad-small-padding-top) + 18px);
+}
+
+/* Contenedor del contenido del cuaderno con líneas horizontales perfectas */
+.notepad-content-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Fondo con líneas horizontales - ALINEACIÓN PERFECTA: cada 1.5rem (24px) */
+.notepad-lines-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 1;
+  
+  /* Líneas horizontales del cuaderno - ALINEACIÓN PERFECTA: cada 1.5rem (24px) */
+  background-image: linear-gradient(#e2e8f0 1px, transparent 1px);
+  background-size: 100% var(--notepad-line-height); /* 1.5rem = 24px - La clave de la alineación */
+  background-position-y: var(--notepad-background-offset-y);
+  background-repeat: repeat-y;
+}
+
+/* Versión para formato pequeño - Ajustar offset */
+.notepad-lines-background.small-format {
+  background-position-y: var(--notepad-small-background-offset-y);
+}
+
+/* Margen rojo - Del super cuaderno */
+.notepad-lines-background::before {
+  content: '';
+  position: absolute;
+  top: var(--notepad-page-padding-top);
+  bottom: 16px; /* Padding-bottom del notepad */
+  left: 50px; /* Posición del margen rojo */
+  width: 1px;
+  background-color: #fca5a5;
+}
+
+/* Margen rojo para formato pequeño */
+.notepad-lines-background.small-format::before {
+  top: var(--notepad-small-padding-top);
+  bottom: 8px; /* Padding-bottom del notepad pequeño */
+  left: 20px; /* Margen rojo más cerca para formato pequeño */
+}
+
+/* Área de contenido editable - ALINEACIÓN PERFECTA con Poppins */
+/* IMPORTANTE: El texto debe iniciar DESPUÉS de la línea de margen */
+.notepad-content-editable {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  outline: none;
+  padding-left: 70px !important; /* 50px (margen rojo) + 20px (espacio después del margen) - Sobrescribe padding de Tailwind */
+  font-family: 'Poppins', sans-serif !important; /* Fuente Poppins - Sobrescribe font-body */
+  font-size: 16px !important; /* text-base en Tailwind - Sobrescribe cualquier tamaño */
+  line-height: 1.5rem !important; /* leading-6 en Tailwind = 24px - LA CLAVE DE LA ALINEACIÓN - Sobrescribe leading */
+  color: #1e293b;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  box-sizing: border-box;
+}
+
+/* Permitir posicionamiento del cursor en cualquier línea */
+.notepad-content-editable * {
+  line-height: 1.5rem; /* 24px - Debe coincidir exactamente con background-size */
+  min-height: 1.5rem; /* 24px */
+}
+
+.notepad-content-editable div {
+  min-height: 1.5rem; /* 24px */
+}
+
+/* Estilo para texto provisional del dictado (gris claro) */
+.notepad-content-editable .dictation-interim {
+  color: #9ca3af !important; /* Gris claro */
+  opacity: 0.7;
+}
+
+/* Versión para formato pequeño (10x15) */
+.notepad-content-editable.small-format {
+  padding-left: 40px !important; /* 20px (margen rojo pequeño) + 20px (espacio después del margen) */
+  font-size: 12px !important;
+  line-height: 1.5rem !important; /* Mantener la misma altura de línea para alineación */
+}
+
+/* Estilos específicos para elemento oyDN2LIr8z7VyYA5727F - Tipografía pequeña */
+.notepad-lines-background.small-typography {
+  background-size: 100% 1rem !important; /* 16px - Líneas más juntas para tipografía pequeña */
+}
+
+.notepad-content-editable.small-typography {
+  font-size: 14px !important; /* Tipografía más pequeña */
+  line-height: 1rem !important; /* 16px - Debe coincidir con background-size */
+}
+
+.notepad-content-editable.small-typography * {
+  line-height: 1rem !important; /* 16px */
+  min-height: 1rem !important; /* 16px */
+}
+
+.notepad-content-editable.small-typography div {
+  min-height: 1rem !important; /* 16px */
+}
+
+/* Scroll infinito hacia abajo para elemento kRfKpBDg946Y99668Tih */
+.notepad-content-editable.infinite-scroll {
+  overflow-y: visible !important; /* Permitir que el contenido crezca más allá */
+  min-height: 100% !important; /* Mínimo altura del contenedor */
+  height: auto !important; /* Altura automática basada en contenido */
+}
+
+.notepad-content-editable.infinite-scroll * {
+  min-height: auto; /* Permitir que el contenido crezca naturalmente */
+}
+
+/* Contenedor con scroll infinito - permitir scroll cuando el contenido excede */
+.notepad-content-container:has(.infinite-scroll) {
+  overflow-y: auto !important;
+  height: 100%;
+  max-height: 100%;
+}
+
+/* CardContent con scroll infinito - permitir scroll cuando el contenido crece */
+.notepad-card:has(.infinite-scroll) .notepad-content-container {
+  overflow-y: auto !important;
+}
+
+/* Asegurar que el CardContent padre también permita scroll */
+.notepad-card:has(.infinite-scroll) > div:has(.notepad-content-container) {
+  overflow-y: auto !important;
+}
+
+/* Estilos específicos para elemento rzBhqCTd8wwZmD8JCNEk - Líneas calipso y fondo #fafad7 */
+.notepad-lines-background[data-element-id="rzBhqCTd8wwZmD8JCNEk"] {
+  background-image: linear-gradient(#40E0D0 1px, transparent 1px) !important; /* Color calipso */
+  background-size: 100% 1rem !important; /* 16px - Líneas más juntas para tipografía pequeña */
+}
+
+.notepad-content-container[data-element-id="rzBhqCTd8wwZmD8JCNEk"] {
+  background-color: #fafad7 !important; /* Fondo beige claro */
+}
+
+.notepad-content-editable.small-typography[data-element-id="rzBhqCTd8wwZmD8JCNEk"] {
+  line-height: 1rem !important; /* 16px - Debe coincidir con background-size */
+}
+
+/* Estilos específicos para elemento XAlG6umOIjtInOCNY1kU - Ajustar líneas con tamaño de texto */
+.notepad-lines-background[data-element-id="XAlG6umOIjtInOCNY1kU"] {
+  background-size: 100% 1.25rem !important; /* 20px - Líneas ajustadas al tamaño de texto */
+}
+
+.notepad-content-editable[data-element-id="XAlG6umOIjtInOCNY1kU"] {
+  font-size: 14px !important; /* Tamaño de texto */
+  line-height: 1.25rem !important; /* 20px - Debe coincidir con background-size */
+}
+
+.notepad-content-editable[data-element-id="XAlG6umOIjtInOCNY1kU"] * {
+  line-height: 1.25rem !important; /* 20px */
+  min-height: 1.25rem !important; /* 20px */
+}
+
+.notepad-content-editable[data-element-id="XAlG6umOIjtInOCNY1kU"] div {
+  min-height: 1.25rem !important; /* 20px */
+}
+
+
