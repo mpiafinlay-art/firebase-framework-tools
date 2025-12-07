@@ -105,12 +105,31 @@ export const useBoardStore = create<BoardState>((set, get) => ({
               id: doc.id, 
               ...doc.data() 
             } as WithId<CanvasElement>));
-            // CRÍTICO: Solo actualizar si realmente cambió (evitar re-renders innecesarios)
+            // CRÍTICO: Solo actualizar si realmente cambió (evitar re-renders innecesarios y bucles infinitos)
             const currentElements = get().elements;
-            const hasChanged = currentElements.length !== newElements.length || 
-              currentElements.some((el, idx) => el.id !== newElements[idx]?.id || el.updatedAt !== newElements[idx]?.updatedAt);
-            if (hasChanged) {
+            // Comparar por IDs y contenido, no por índice (el orden puede cambiar)
+            const currentIds = new Set(currentElements.map(el => el.id));
+            const newIds = new Set(newElements.map(el => el.id));
+            const idsChanged = currentIds.size !== newIds.size || 
+              Array.from(currentIds).some(id => !newIds.has(id)) ||
+              Array.from(newIds).some(id => !currentIds.has(id));
+            
+            // Si los IDs cambiaron, actualizar siempre
+            if (idsChanged) {
               set({ elements: newElements, isLoading: false });
+            } else {
+              // Si los IDs son iguales, comparar contenido de cada elemento
+              const contentChanged = currentElements.some((el) => {
+                const newEl = newElements.find(ne => ne.id === el.id);
+                if (!newEl) return true;
+                // Comparar solo campos relevantes, NO updatedAt (cambia siempre con serverTimestamp)
+                return JSON.stringify(el.content) !== JSON.stringify(newEl.content) ||
+                       JSON.stringify(el.properties) !== JSON.stringify(newEl.properties) ||
+                       el.zIndex !== newEl.zIndex;
+              });
+              if (contentChanged) {
+                set({ elements: newElements, isLoading: false });
+              }
             }
           },
           (error) => {
@@ -134,12 +153,27 @@ export const useBoardStore = create<BoardState>((set, get) => ({
                   const bZ = b.zIndex || 0;
                   return aZ - bZ;
                 });
-                // CRÍTICO: Solo actualizar si realmente cambió
+                // CRÍTICO: Solo actualizar si realmente cambió (misma lógica que arriba)
                 const currentElements = get().elements;
-                const hasChanged = currentElements.length !== newElements.length || 
-                  currentElements.some((el, idx) => el.id !== newElements[idx]?.id || el.updatedAt !== newElements[idx]?.updatedAt);
-                if (hasChanged) {
+                const currentIds = new Set(currentElements.map(el => el.id));
+                const newIds = new Set(newElements.map(el => el.id));
+                const idsChanged = currentIds.size !== newIds.size || 
+                  Array.from(currentIds).some(id => !newIds.has(id)) ||
+                  Array.from(newIds).some(id => !currentIds.has(id));
+                
+                if (idsChanged) {
                   set({ elements: newElements, isLoading: false });
+                } else {
+                  const contentChanged = currentElements.some((el) => {
+                    const newEl = newElements.find(ne => ne.id === el.id);
+                    if (!newEl) return true;
+                    return JSON.stringify(el.content) !== JSON.stringify(newEl.content) ||
+                           JSON.stringify(el.properties) !== JSON.stringify(newEl.properties) ||
+                           el.zIndex !== newEl.zIndex;
+                  });
+                  if (contentChanged) {
+                    set({ elements: newElements, isLoading: false });
+                  }
                 }
               },
               (fallbackError) => {
@@ -166,12 +200,27 @@ export const useBoardStore = create<BoardState>((set, get) => ({
               const bZ = b.zIndex || 0;
               return aZ - bZ;
             });
-            // CRÍTICO: Solo actualizar si realmente cambió
+            // CRÍTICO: Solo actualizar si realmente cambió (misma lógica que arriba)
             const currentElements = get().elements;
-            const hasChanged = currentElements.length !== newElements.length || 
-              currentElements.some((el, idx) => el.id !== newElements[idx]?.id || el.updatedAt !== newElements[idx]?.updatedAt);
-            if (hasChanged) {
+            const currentIds = new Set(currentElements.map(el => el.id));
+            const newIds = new Set(newElements.map(el => el.id));
+            const idsChanged = currentIds.size !== newIds.size || 
+              Array.from(currentIds).some(id => !newIds.has(id)) ||
+              Array.from(newIds).some(id => !currentIds.has(id));
+            
+            if (idsChanged) {
               set({ elements: newElements, isLoading: false });
+            } else {
+              const contentChanged = currentElements.some((el) => {
+                const newEl = newElements.find(ne => ne.id === el.id);
+                if (!newEl) return true;
+                return JSON.stringify(el.content) !== JSON.stringify(newEl.content) ||
+                       JSON.stringify(el.properties) !== JSON.stringify(newEl.properties) ||
+                       el.zIndex !== newEl.zIndex;
+              });
+              if (contentChanged) {
+                set({ elements: newElements, isLoading: false });
+              }
             }
           },
           (error) => {

@@ -235,17 +235,21 @@ export default function BoardPage({ params }: BoardPageProps) {
   // -- EFECTOS --
 
   // Sincronizar selección
-  // CRÍTICO: Optimizado para evitar re-renders constantes cuando elements cambia
-  // Usar useMemo con dependencia correcta del array completo
+  // CRÍTICO: Optimizado para evitar re-renders constantes y bucles infinitos
   const selectedElementId = selectedElementIds.length === 1 ? selectedElementIds[0] : null;
   const foundElement = useMemo(() => {
     if (!selectedElementId || !elements || elements.length === 0) return null;
     return elements.find(el => el.id === selectedElementId) || null;
-  }, [selectedElementId, elements]); // ✅ Depender del array completo para evitar datos obsoletos
+  }, [selectedElementId, elements.length, selectedElementId ? elements.find(e => e.id === selectedElementId)?.updatedAt : null]); // ✅ Depender de length y updatedAt, no del array completo
   
+  // CRÍTICO: Solo actualizar si el ID realmente cambió (evitar bucles infinitos)
   useEffect(() => {
-    setSelectedElement(foundElement);
-  }, [foundElement]);
+    const foundId = foundElement?.id ?? null;
+    const currentId = selectedElement?.id ?? null;
+    if (foundId !== currentId) {
+      setSelectedElement(foundElement);
+    }
+  }, [foundElement?.id, selectedElement?.id]); // ✅ Depender solo de IDs, no de objetos completos
 
   // -- LOGGING EN CONSOLA cuando se selecciona un elemento --
   // OPTIMIZADO: Solo loggear en desarrollo y con información esencial
