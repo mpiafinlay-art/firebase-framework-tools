@@ -136,7 +136,7 @@ export function useElementManager(boardId: string, getViewportCenter: () => { x:
       Object.assign(baseProperties, props.properties);
     }
 
-    let newElementData: Omit<WithId<CanvasElement>, 'id'>;
+    let newElementData: Omit<WithId<CanvasElement>, 'id'> & { type: ElementType };
 
     switch (type) {
       case 'notepad':
@@ -225,16 +225,16 @@ export function useElementManager(boardId: string, getViewportCenter: () => { x:
       case 'stopwatch':
         const stopwatchSize = { width: 200, height: 120 };
         const stopwatchPos = getCenteredPosition(stopwatchSize.width, stopwatchSize.height);
-        newElementData = { type, x: stopwatchPos.x, y: stopwatchPos.y, width: stopwatchSize.width, height: stopwatchSize.height, userId: user.uid, properties: { ...baseProperties, position: stopwatchPos, size: stopwatchSize, backgroundColor: '#000000' }, content: { time: 0, isRunning: false }, zIndex, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }; break;
+        newElementData = { type: 'stopwatch' as ElementType, x: stopwatchPos.x, y: stopwatchPos.y, width: stopwatchSize.width, height: stopwatchSize.height, userId: user.uid, properties: { ...baseProperties, position: stopwatchPos, size: stopwatchSize, backgroundColor: '#000000' }, content: { time: 0, isRunning: false }, zIndex, createdAt: serverTimestamp(), updatedAt: serverTimestamp() } as Omit<WithId<CanvasElement>, 'id'> & { type: ElementType }; break;
       case 'countdown':
         const countdownSize = { width: 200, height: 180 };
         const countdownPos = getCenteredPosition(countdownSize.width, countdownSize.height);
-        newElementData = { type, x: countdownPos.x, y: countdownPos.y, width: countdownSize.width, height: countdownSize.height, userId: user.uid, properties: { ...baseProperties, position: countdownPos, size: countdownSize, backgroundColor: '#000000' }, content: { timeLeft: 0, selectedMinutes: 5, isRunning: false }, zIndex, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }; break;
+        newElementData = { type: 'countdown' as ElementType, x: countdownPos.x, y: countdownPos.y, width: countdownSize.width, height: countdownSize.height, userId: user.uid, properties: { ...baseProperties, position: countdownPos, size: countdownSize, backgroundColor: '#000000' }, content: { timeLeft: 0, selectedMinutes: 5, isRunning: false }, zIndex, createdAt: serverTimestamp(), updatedAt: serverTimestamp() } as Omit<WithId<CanvasElement>, 'id'> & { type: ElementType }; break;
       case 'highlight-text':
         const highlightSize = { width: 300, height: 150 };
         const highlightPos = getCenteredPosition(highlightSize.width, highlightSize.height);
         const highlightColor = (props?.properties?.backgroundColor) ? props.properties.backgroundColor : '#fffb8b';
-        newElementData = { type, x: highlightPos.x, y: highlightPos.y, width: highlightSize.width, height: highlightSize.height, userId: user.uid, properties: { ...baseProperties, position: highlightPos, size: highlightSize, backgroundColor: highlightColor }, content: { text: '' }, zIndex, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }; break;
+        newElementData = { type: 'highlight-text' as ElementType, x: highlightPos.x, y: highlightPos.y, width: highlightSize.width, height: highlightSize.height, userId: user.uid, properties: { ...baseProperties, position: highlightPos, size: highlightSize, backgroundColor: highlightColor }, content: { text: '' }, zIndex, createdAt: serverTimestamp(), updatedAt: serverTimestamp() } as Omit<WithId<CanvasElement>, 'id'> & { type: ElementType }; break;
       case 'yellow-notepad':
         // Tamaño basado en las imágenes: aproximadamente 400x600px (portrait)
         const yellowNotepadSize = { width: 400, height: 600 };

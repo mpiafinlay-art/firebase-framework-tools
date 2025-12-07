@@ -215,13 +215,20 @@ export default function BoardPage({ params }: BoardPageProps) {
     return { x: 40000, y: 40000 }; // Fallback para SSR
   }, []);
 
+  // CRÍTICO: Usar ref para elements para evitar recreación de función
+  const elementsRef = useRef(elements);
+  useEffect(() => {
+    elementsRef.current = elements;
+  }, [elements]);
+
   const getNextZIndex = useCallback(() => {
-    if (!elements || elements.length === 0) return 1;
-    const zIndexes = elements
+    const currentElements = elementsRef.current;
+    if (!currentElements || currentElements.length === 0) return 1;
+    const zIndexes = currentElements
       .filter(e => typeof e.zIndex === 'number')
       .map(e => e.zIndex!);
     return zIndexes.length > 0 ? Math.max(...zIndexes) + 1 : 2;
-  }, [elements]);
+  }, []); // ✅ Sin dependencias - usa ref
 
   const { addElement } = useElementManager(boardId, getViewportCenter, getNextZIndex);
 
@@ -229,12 +236,12 @@ export default function BoardPage({ params }: BoardPageProps) {
 
   // Sincronizar selección
   // CRÍTICO: Optimizado para evitar re-renders constantes cuando elements cambia
-  // Usar useMemo para encontrar elemento solo cuando selectedElementIds cambia
+  // Usar useMemo con dependencia correcta del array completo
   const selectedElementId = selectedElementIds.length === 1 ? selectedElementIds[0] : null;
   const foundElement = useMemo(() => {
     if (!selectedElementId || !elements || elements.length === 0) return null;
     return elements.find(el => el.id === selectedElementId) || null;
-  }, [selectedElementId, elements.length]); // Solo depender de length, no del array completo
+  }, [selectedElementId, elements]); // ✅ Depender del array completo para evitar datos obsoletos
   
   useEffect(() => {
     setSelectedElement(foundElement);

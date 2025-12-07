@@ -101,11 +101,17 @@ export const useBoardStore = create<BoardState>((set, get) => ({
         unsubscribe = onSnapshot(
           elementsQuery,
           (snapshot) => {
-            const elements = snapshot.docs.map(doc => ({ 
+            const newElements = snapshot.docs.map(doc => ({ 
               id: doc.id, 
               ...doc.data() 
             } as WithId<CanvasElement>));
-            set({ elements, isLoading: false });
+            // CRÍTICO: Solo actualizar si realmente cambió (evitar re-renders innecesarios)
+            const currentElements = get().elements;
+            const hasChanged = currentElements.length !== newElements.length || 
+              currentElements.some((el, idx) => el.id !== newElements[idx]?.id || el.updatedAt !== newElements[idx]?.updatedAt);
+            if (hasChanged) {
+              set({ elements: newElements, isLoading: false });
+            }
           },
           (error) => {
             console.error("Error en listener de elementos:", error);
@@ -118,17 +124,23 @@ export const useBoardStore = create<BoardState>((set, get) => ({
             const fallbackUnsubscribe = onSnapshot(
               elementsCollection,
               (snapshot) => {
-                const elements = snapshot.docs.map(doc => ({ 
+                const newElements = snapshot.docs.map(doc => ({ 
                   id: doc.id, 
                   ...doc.data() 
                 } as WithId<CanvasElement>));
                 // Ordenar manualmente por zIndex
-                elements.sort((a, b) => {
+                newElements.sort((a, b) => {
                   const aZ = a.zIndex || 0;
                   const bZ = b.zIndex || 0;
                   return aZ - bZ;
                 });
-                set({ elements, isLoading: false });
+                // CRÍTICO: Solo actualizar si realmente cambió
+                const currentElements = get().elements;
+                const hasChanged = currentElements.length !== newElements.length || 
+                  currentElements.some((el, idx) => el.id !== newElements[idx]?.id || el.updatedAt !== newElements[idx]?.updatedAt);
+                if (hasChanged) {
+                  set({ elements: newElements, isLoading: false });
+                }
               },
               (fallbackError) => {
                 console.error("Error en listener de elementos (fallback):", fallbackError);
@@ -144,17 +156,23 @@ export const useBoardStore = create<BoardState>((set, get) => ({
         unsubscribe = onSnapshot(
           elementsCollection,
           (snapshot) => {
-            const elements = snapshot.docs.map(doc => ({ 
+            const newElements = snapshot.docs.map(doc => ({ 
               id: doc.id, 
               ...doc.data() 
             } as WithId<CanvasElement>));
             // Ordenar manualmente por zIndex
-            elements.sort((a, b) => {
+            newElements.sort((a, b) => {
               const aZ = a.zIndex || 0;
               const bZ = b.zIndex || 0;
               return aZ - bZ;
             });
-            set({ elements, isLoading: false });
+            // CRÍTICO: Solo actualizar si realmente cambió
+            const currentElements = get().elements;
+            const hasChanged = currentElements.length !== newElements.length || 
+              currentElements.some((el, idx) => el.id !== newElements[idx]?.id || el.updatedAt !== newElements[idx]?.updatedAt);
+            if (hasChanged) {
+              set({ elements: newElements, isLoading: false });
+            }
           },
           (error) => {
             console.error("Error en listener de elementos:", error);
