@@ -1,0 +1,11 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Permite a los usuarios leer, escribir y eliminar archivos solo en su propia carpeta de imágenes.
+    match /users/{userId}/images/{imageId} {
+      allow read: if request.auth != null;
+      allow write, delete: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
