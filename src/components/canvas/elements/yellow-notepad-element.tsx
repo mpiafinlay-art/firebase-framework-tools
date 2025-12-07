@@ -50,15 +50,33 @@ export default function YellowNotepadElement(props: CommonElementProps) {
   const textContent = typedContent.text || '';
   const initialSearchQuery = typedContent.searchQuery || '';
   
+  // Refs para mantener referencias estables y evitar loops
+  const typedContentRef = useRef(typedContent);
+  const textContentRef = useRef(textContent);
+  
+  // Sincronizar refs cuando cambian
+  useEffect(() => {
+    typedContentRef.current = typedContent;
+    textContentRef.current = textContent;
+  }, [typedContent, textContent]);
+  
   // Estado local para búsqueda (sincronizado con contenido)
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   
+  // Ref para almacenar el searchQuery anterior y evitar loops
+  const prevSearchQueryRef = useRef<string | undefined>(undefined);
+  
   // Sincronizar searchQuery cuando cambia el contenido
   useEffect(() => {
-    if (typedContent.searchQuery !== undefined && typedContent.searchQuery !== searchQuery) {
-      setSearchQuery(typedContent.searchQuery);
+    const currentSearchQuery = typedContent.searchQuery;
+    // Solo actualizar si realmente cambió
+    if (currentSearchQuery !== undefined && currentSearchQuery !== prevSearchQueryRef.current) {
+      prevSearchQueryRef.current = currentSearchQuery;
+      if (currentSearchQuery !== searchQuery) {
+        setSearchQuery(currentSearchQuery);
+      }
     }
-  }, [typedContent.searchQuery]);
+  }, [typedContent.searchQuery, searchQuery]);
 
   // Hook de autoguardado
   const { saveStatus, handleBlur: handleAutoSaveBlur, handleChange } = useAutoSave({
@@ -67,7 +85,9 @@ export default function YellowNotepadElement(props: CommonElementProps) {
       return html;
     },
     onSave: async (newText) => {
-      const normalizedText = (textContent || '').trim();
+      // Usar refs para evitar dependencias circulares
+      const currentText = textContentRef.current;
+      const normalizedText = (currentText || '').trim();
       if (newText !== normalizedText) {
         await onUpdate(id, { 
           content: { 
@@ -85,8 +105,17 @@ export default function YellowNotepadElement(props: CommonElementProps) {
     },
   });
 
+  // Ref para almacenar el textContent anterior y evitar loops
+  const prevTextContentRef = useRef<string>('');
+  
   // Sincronizar contenido desde props
   useEffect(() => {
+    // Solo ejecutar si realmente cambió
+    if (prevTextContentRef.current === textContent) {
+      return;
+    }
+    prevTextContentRef.current = textContent;
+    
     if (contentRef.current && textContent !== contentRef.current.innerText) {
       const isFocused = document.activeElement === contentRef.current;
       if (!isFocused) {
@@ -130,7 +159,7 @@ export default function YellowNotepadElement(props: CommonElementProps) {
 
       const canvas = await html2canvas(yellowNotepadCard, {
         backgroundColor: '#FFFFE0',
-        scale: 3,
+        scale: 2.1, // Alta resolución reducida 30% (de 3x a 2.1x)
         useCORS: true,
         logging: false,
         allowTaint: false,
@@ -188,13 +217,15 @@ export default function YellowNotepadElement(props: CommonElementProps) {
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setSearchQuery(query);
+    // Usar ref para evitar dependencias circulares
+    const currentContent = typedContentRef.current;
     onUpdate(id, { 
       content: { 
-        ...typedContent,
+        ...currentContent,
         searchQuery: query 
       } 
     });
-  }, [id, onUpdate, typedContent]);
+  }, [id, onUpdate]); // Eliminar typedContent de dependencias
 
   // Manejar eliminar
   const handleDelete = useCallback(() => {

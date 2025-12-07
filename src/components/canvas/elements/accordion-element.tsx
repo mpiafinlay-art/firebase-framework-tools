@@ -33,7 +33,20 @@ export default function AccordionElement(props: CommonElementProps) {
   const [items, setItems] = useState<AccordionItem[]>(accordionContent.items || []);
   const [openItems, setOpenItems] = useState<string[]>(items.filter(item => item.isOpen).map(item => item.id));
 
+  // Ref para almacenar el contenido anterior y evitar loops
+  const prevContentRef = useRef<string>('');
+  
   useEffect(() => {
+    // Crear string estable para comparar
+    const contentString = JSON.stringify(content);
+    
+    // Solo ejecutar si realmente cambió
+    if (prevContentRef.current === contentString) {
+      return;
+    }
+    
+    prevContentRef.current = contentString;
+    
     if (typeof content === 'object' && content !== null && 'items' in content) {
       const newContent = content as AccordionContent;
       setItems(newContent.items || []);
@@ -294,13 +307,23 @@ function EditableContent({
     },
   });
 
+  // Ref para almacenar el valor anterior y evitar loops
+  const prevValueRef = useRef<string>('');
+  
   useEffect(() => {
-    // CRÍTICO: Solo actualizar si el elemento NO está enfocado (para no perder cursor)
+    // Solo ejecutar si realmente cambió el valor
+    if (prevValueRef.current === value) {
+      return;
+    }
+    prevValueRef.current = value;
+    
+    // CRÍTICO: Solo actualizar si el elemento NO está enfocado Y NO hay dictado activo
     if (editorRef.current && value !== editorRef.current.innerHTML) {
       const isFocused = document.activeElement === editorRef.current;
+      const isDictating = isListening && (liveTranscript || finalTranscript || interimTranscript);
       
-      if (isFocused) {
-        // Si está enfocado, NO actualizar innerHTML (preservar cursor)
+      // Si está enfocado O hay dictado activo, NO actualizar innerHTML (preservar cursor y texto del dictado)
+      if (isFocused || isDictating) {
         return;
       }
       
@@ -332,7 +355,7 @@ function EditableContent({
         }
       }
     }
-  }, [value]);
+  }, [value, isListening, liveTranscript, finalTranscript, interimTranscript]);
 
   // Soporte para dictado usando hook helper
   useDictationInput({

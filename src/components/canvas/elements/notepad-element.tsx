@@ -107,6 +107,16 @@ export default function NotepadElement(props: CommonElementProps) {
   
   const currentPageIndex = typedContent.currentPage ?? 0;
   
+  // Refs para mantener referencias estables y evitar loops
+  const typedContentRef = useRef(typedContent);
+  const currentPageIndexRef = useRef(currentPageIndex);
+  
+  // Sincronizar refs cuando cambian
+  useEffect(() => {
+    typedContentRef.current = typedContent;
+    currentPageIndexRef.current = currentPageIndex;
+  }, [typedContent, currentPageIndex]);
+  
   // Hook de autoguardado robusto para el contenido del cuaderno
   // IMPORTANTE: Se actualiza cuando cambia currentPageIndex para evitar stale closures
   const { saveStatus, handleBlur: handleAutoSaveBlur, handleChange, forceSave } = useAutoSave({
@@ -118,20 +128,26 @@ export default function NotepadElement(props: CommonElementProps) {
     },
     onSave: async (newHtml) => {
       if (isPreview || !contentRef.current) return;
-      const currentPages = typedContent.pages || [''];
-      const currentPageContent = (currentPages[currentPageIndex] || '').replace(/\s+/g, ' ').replace(/>\s+</g, '><').trim();
+      // Usar refs para evitar dependencias circulares
+      const currentContent = typedContentRef.current;
+      const currentPage = currentPageIndexRef.current;
+      const currentPages = currentContent.pages || [''];
+      const currentPageContent = (currentPages[currentPage] || '').replace(/\s+/g, ' ').replace(/>\s+</g, '><').trim();
       // Comparar contenido normalizado
       if (newHtml !== currentPageContent) {
         const newPages = [...currentPages];
-        newPages[currentPageIndex] = newHtml;
-        await onUpdate(id, { content: { ...typedContent, pages: newPages } });
+        newPages[currentPage] = newHtml;
+        await onUpdate(id, { content: { ...currentContent, pages: newPages } });
       }
     },
     debounceMs: 2000,
     disabled: isPreview,
     compareContent: (oldContent, newContent) => {
-      const currentPages = typedContent.pages || [''];
-      const currentPageContent = (currentPages[currentPageIndex] || '').replace(/\s+/g, ' ').replace(/>\s+</g, '><').trim();
+      // Usar refs para evitar dependencias circulares
+      const currentContent = typedContentRef.current;
+      const currentPage = currentPageIndexRef.current;
+      const currentPages = currentContent.pages || [''];
+      const currentPageContent = (currentPages[currentPage] || '').replace(/\s+/g, ' ').replace(/>\s+</g, '><').trim();
       // Normalizar ambos para comparación
       const normalizedOld = (oldContent || '').replace(/\s+/g, ' ').replace(/>\s+</g, '><').trim();
       const normalizedNew = (newContent || '').replace(/\s+/g, ' ').replace(/>\s+</g, '><').trim();
@@ -144,19 +160,31 @@ export default function NotepadElement(props: CommonElementProps) {
     await forceSave();
   }, [forceSave]);
 
+  // Ref para almacenar el contenido anterior y evitar loops
+  const prevPagesRef = useRef<string>('');
+  
   useEffect(() => {
     if (contentRef.current) {
-        const isFocused = document.activeElement === contentRef.current;
-        if (!isFocused) {
-            const pageContent = typedContent.pages?.[currentPageIndex] ?? '';
-            // Limpiar contenido vacío o con solo <div><br></div>
-            const cleanContent = pageContent === '<div><br></div>' || pageContent === '<div></div>' || pageContent.trim() === '' ? '' : pageContent;
-            // CRÍTICO: Solo actualizar si NO está enfocado (preservar cursor)
-            const isFocused = document.activeElement === contentRef.current;
-            if (!isFocused && contentRef.current.innerHTML !== cleanContent) {
-                contentRef.current.innerHTML = cleanContent;
-            }
+      // Crear string estable para comparar
+      const pagesString = JSON.stringify(typedContent.pages) + currentPageIndex;
+      
+      // Solo ejecutar si realmente cambió
+      if (prevPagesRef.current === pagesString) {
+        return;
+      }
+      
+      prevPagesRef.current = pagesString;
+      
+      const isFocused = document.activeElement === contentRef.current;
+      if (!isFocused) {
+        const pageContent = typedContent.pages?.[currentPageIndex] ?? '';
+        // Limpiar contenido vacío o con solo <div><br></div>
+        const cleanContent = pageContent === '<div><br></div>' || pageContent === '<div></div>' || pageContent.trim() === '' ? '' : pageContent;
+        // CRÍTICO: Solo actualizar si NO está enfocado (preservar cursor)
+        if (!isFocused && contentRef.current.innerHTML !== cleanContent) {
+          contentRef.current.innerHTML = cleanContent;
         }
+      }
     }
   }, [typedContent.pages, currentPageIndex]);
 
@@ -181,8 +209,10 @@ export default function NotepadElement(props: CommonElementProps) {
     getContent: () => titleRef.current?.innerText || '',
     onSave: async (newTitle) => {
       if (isPreview || !titleRef.current) return;
-      if (typedContent.title !== newTitle) {
-        const newContent: NotepadContent = { ...typedContent, title: newTitle };
+      // Usar ref para evitar dependencias circulares
+      const currentContent = typedContentRef.current;
+      if (currentContent.title !== newTitle) {
+        const newContent: NotepadContent = { ...currentContent, title: newTitle };
         onUpdate(id, { content: newContent });
       }
     },
@@ -205,24 +235,28 @@ export default function NotepadElement(props: CommonElementProps) {
   
   const handlePageChange = useCallback((newPage: number) => {
     if (isPreview) return;
-    if (newPage >= 0 && newPage < (typedContent.pages?.length || 0)) {
+    // Usar ref para evitar dependencias circulares
+    const currentContent = typedContentRef.current;
+    if (newPage >= 0 && newPage < (currentContent.pages?.length || 0)) {
       saveContent(); 
       onUpdate(id, {
-        content: { ...typedContent, currentPage: newPage }
+        content: { ...currentContent, currentPage: newPage }
       });
     }
-  }, [isPreview, typedContent, onUpdate, id, saveContent]);
+  }, [isPreview, onUpdate, id, saveContent]);
 
   const handleAddPage = useCallback(() => {
     if (isPreview) return;
-    if ((typedContent.pages?.length || 0) < 20) {
+    // Usar ref para evitar dependencias circulares
+    const currentContent = typedContentRef.current;
+    if ((currentContent.pages?.length || 0) < 20) {
       saveContent();
-      const newPages = [...(typedContent.pages || []), '']; // Página vacía sin <div><br></div>
+      const newPages = [...(currentContent.pages || []), '']; // Página vacía sin <div><br></div>
       onUpdate(id, {
-        content: { ...typedContent, pages: newPages, currentPage: newPages.length - 1 },
+        content: { ...currentContent, pages: newPages, currentPage: newPages.length - 1 },
       });
     }
-  }, [isPreview, typedContent, onUpdate, id, saveContent]);
+  }, [isPreview, onUpdate, id, saveContent]);
 
   const toggleMinimize = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -272,7 +306,7 @@ export default function NotepadElement(props: CommonElementProps) {
           });
       }
     }, 100); // Pequeño delay para asegurar que saveContent se ejecutó
-  }, [isPreview, minimized, properties, onUpdate, id, saveContent]);
+  }, [isPreview, minimized, properties, onUpdate, id, saveContent]); // Mantener dependencias necesarias
   
   const handleCloseNotepad = useCallback((e: React.MouseEvent) => { 
     e.stopPropagation(); 
@@ -305,10 +339,10 @@ export default function NotepadElement(props: CommonElementProps) {
         description: 'Generando imagen PNG de alta resolución del cuaderno.',
       });
 
-      // Capturar el elemento usando html2canvas con alta resolución
+      // Capturar el elemento usando html2canvas con alta resolución (reducido 30%)
       const canvas = await html2canvas(notepadCard, {
         backgroundColor: '#ffffff',
-        scale: 3, // Alta resolución (3x)
+        scale: 2.1, // Alta resolución reducida 30% (de 3x a 2.1x)
         useCORS: true,
         logging: false,
         allowTaint: false,

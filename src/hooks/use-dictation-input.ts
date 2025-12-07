@@ -39,13 +39,24 @@ export function useDictationInput({
     lastInsertedText: '',
     lastFinalText: '',
   });
+  
+  // CRÍTICO: Ref para rastrear el último liveTranscript procesado y evitar duplicación
+  const lastProcessedTranscriptRef = useRef<string>('');
+
+  // Ref para mantener referencia estable a elementRef
+  const elementRefStable = useRef(elementRef.current);
+  
+  // Sincronizar ref cuando cambia elementRef
+  useEffect(() => {
+    elementRefStable.current = elementRef.current;
+  }, [elementRef.current]);
 
   useEffect(() => {
-    if (!enabled || !isListening || !elementRef.current) {
+    if (!enabled || !isListening || !elementRefStable.current) {
       return;
     }
 
-    const element = elementRef.current;
+    const element = elementRefStable.current;
 
     // CRÍTICO: Solo procesar si el elemento está enfocado O está seleccionado
     // Esto permite que funcione incluso si el elemento no tiene focus pero está seleccionado
@@ -61,6 +72,12 @@ export function useDictationInput({
       return;
     }
 
+    // CRÍTICO: Evitar procesar el mismo liveTranscript dos veces
+    // Si el liveTranscript no ha cambiado desde la última vez, no procesar
+    if (liveTranscript === lastProcessedTranscriptRef.current && liveTranscript !== '') {
+      return;
+    }
+
     try {
       // Determinar tipo de elemento y usar el helper apropiado
       if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
@@ -70,22 +87,26 @@ export function useDictationInput({
           finalTranscript || '',
           dictationStateRef.current
         );
+        // Actualizar ref después de insertar
+        lastProcessedTranscriptRef.current = liveTranscript;
       } else if (element.isContentEditable) {
         // Si no está enfocado pero está seleccionado, enfocarlo primero
         if (!isFocused && isSelected) {
           element.focus();
           // Esperar un momento para que el focus se establezca
           setTimeout(() => {
-            if (elementRef.current) {
+            if (elementRefStable.current) {
               insertDictationTextToContentEditable(
-                elementRef.current,
+                elementRefStable.current,
                 liveTranscript || '',
                 finalTranscript || '',
                 interimTranscript || '',
                 dictationStateRef.current
               );
               const inputEvent = new Event('input', { bubbles: true });
-              elementRef.current.dispatchEvent(inputEvent);
+              elementRefStable.current.dispatchEvent(inputEvent);
+              // Actualizar ref después de insertar
+              lastProcessedTranscriptRef.current = liveTranscript;
             }
           }, 50);
         } else {
@@ -99,24 +120,27 @@ export function useDictationInput({
           // Disparar evento input para autoguardado
           const inputEvent = new Event('input', { bubbles: true });
           element.dispatchEvent(inputEvent);
+          // Actualizar ref después de insertar
+          lastProcessedTranscriptRef.current = liveTranscript;
         }
       }
     } catch (error) {
       console.error('Error insertando dictado:', error);
     }
-  }, [isListening, liveTranscript, finalTranscript, interimTranscript, isSelected, enabled, elementRef]);
+  }, [isListening, liveTranscript, finalTranscript, interimTranscript, isSelected, enabled]); // Eliminar elementRef de dependencias
 
   // Finalizar texto provisional cuando se detiene el dictado o hay texto final
   useEffect(() => {
-    if (!isListening && elementRef.current && elementRef.current.isContentEditable) {
+    const element = elementRefStable.current;
+    if (!isListening && element && element.isContentEditable) {
       const { finalizeInterimText } = require('@/lib/dictation-helper');
-      finalizeInterimText(elementRef.current);
+      finalizeInterimText(element);
     }
-    if (finalTranscript && elementRef.current && elementRef.current.isContentEditable) {
+    if (finalTranscript && element && element.isContentEditable) {
       const { finalizeInterimText } = require('@/lib/dictation-helper');
-      finalizeInterimText(elementRef.current);
+      finalizeInterimText(element);
     }
-  }, [isListening, finalTranscript, elementRef]);
+  }, [isListening, finalTranscript]); // Eliminar elementRef de dependencias
 
   // Resetear estado cuando se detiene el dictado
   useEffect(() => {
@@ -125,6 +149,8 @@ export function useDictationInput({
         lastInsertedText: '',
         lastFinalText: '',
       };
+      // CRÍTICO: Resetear también el ref de transcript procesado
+      lastProcessedTranscriptRef.current = '';
     }
   }, [isListening]);
 }
