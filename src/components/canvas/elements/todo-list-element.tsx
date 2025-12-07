@@ -282,7 +282,7 @@ export default function TodoListElement(props: CommonElementProps) {
         'min-w-[200px] min-h-[150px]',
         'rounded-lg shadow-md border-none'
       )}
-      style={{ backgroundColor }}
+      style={{ backgroundColor: '#ffffff' }} // Fondo blanco para el card, color solo en header
       onClick={() => onEditElement(id)}
     >
       {/* Indicador de estado de guardado */}
@@ -290,7 +290,10 @@ export default function TodoListElement(props: CommonElementProps) {
         <SaveStatusIndicator status={saveStatus} size="sm" />
       </div>
       {/* HEADER */}
-      <CardHeader className="p-2 pb-2 border-b border-gray-200/50">
+      <CardHeader 
+        className="p-2 pb-2 border-b border-gray-200/50"
+        style={{ backgroundColor }} // Color solo en el header
+      >
         <div className="flex items-center justify-between gap-1">
           {/* Izquierda: Drag Handle + Título */}
           <div className="flex items-center gap-1 flex-1 min-w-0">
@@ -321,7 +324,7 @@ export default function TodoListElement(props: CommonElementProps) {
                     e.stopPropagation();
                     setColorPopoverOpen(true);
                   }}
-                  title="Cambiar color de fondo"
+                  title="Cambiar color del header"
                 >
                   <Palette className="h-3 w-3" />
                 </Button>
@@ -344,7 +347,7 @@ export default function TodoListElement(props: CommonElementProps) {
                         e.stopPropagation();
                         handleColorChange(color.value);
                       }}
-                      title={color.label}
+                      title={`${color.label} - Aplicar al header`}
                     />
                   ))}
                 </div>
@@ -359,17 +362,17 @@ export default function TodoListElement(props: CommonElementProps) {
                   size="icon"
                   className="h-6 w-6"
                   onClick={(e) => e.stopPropagation()}
-                  title="Más opciones"
+                  title="Más opciones - Copiar, exportar o eliminar lista"
                 >
                   <MoreVertical className="h-3 w-3" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()} className="text-sm">
-                <DropdownMenuItem onClick={handleCopyAsText} className="text-sm">
+                <DropdownMenuItem onClick={handleCopyAsText} className="text-sm" title="Copia la lista completa al portapapeles en formato texto">
                   <Copy className="mr-2 h-3 w-3" />
                   <span>Copiar lista como texto</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportPNG} className="text-sm">
+                <DropdownMenuItem onClick={handleExportPNG} className="text-sm" title="Exporta la lista como imagen PNG de alta resolución (reducida 30%)">
                   <Download className="mr-2 h-3 w-3" />
                   <span>Exportar a PNG: alta resolución</span>
                 </DropdownMenuItem>

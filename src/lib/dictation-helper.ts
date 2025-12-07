@@ -41,6 +41,25 @@ export function insertDictationTextToContentEditable(
     dictationState.lastFinalText = '';
   }
 
+  // CRÍTICO: Verificar si el texto ya está en el elemento para evitar duplicación
+  const currentText = element.textContent || '';
+  const currentTextTrimmed = currentText.trim();
+  const liveTranscriptTrimmed = liveTranscript.trim();
+  
+  // Si el texto completo ya está en el elemento, no insertar nada
+  if (currentTextTrimmed.includes(liveTranscriptTrimmed) && liveTranscriptTrimmed.length > 0) {
+    // Verificar si el texto está al final del elemento (donde debería estar)
+    const textEnd = currentTextTrimmed.slice(-liveTranscriptTrimmed.length);
+    if (textEnd === liveTranscriptTrimmed) {
+      // El texto ya está insertado, solo actualizar el estado
+      dictationState.lastInsertedText = liveTranscript;
+      if (finalTranscript) {
+        dictationState.lastFinalText = finalTranscript;
+      }
+      return;
+    }
+  }
+
   // Calcular solo el texto nuevo a insertar
   let textToInsert = '';
   if (dictationState.lastInsertedText) {

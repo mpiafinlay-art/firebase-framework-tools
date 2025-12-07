@@ -148,6 +148,9 @@ export default function BoardPage({ params }: BoardPageProps) {
   const [isEditCommentDialogOpen, setIsEditCommentDialogOpen] = useState(false);
   const [selectedCommentForEdit, setSelectedCommentForEdit] = useState<WithId<CanvasElement> | null>(null);
   
+  // Ref para almacenar zIndex original de elementos cuando se editan
+  const originalZIndexRef = useRef<Map<string, number>>(new Map());
+  
   // Panel de información del elemento (Opción 4: Combinación Panel + Consola)
   const [isInfoPanelVisible, setIsInfoPanelVisible] = useState(false); // Oculto por defecto, se muestra al seleccionar elemento
 
@@ -541,6 +544,76 @@ export default function BoardPage({ params }: BoardPageProps) {
     setIsEditCommentDialogOpen(true);
   }, []);
 
+  // REGLAS Z-INDEX: Cuando se hace click en un elemento, pasa al frente para editarlo
+  // Cuadernos y lienzo siempre están en primera capa (zIndex base alto)
+  // Después de editar, el elemento vuelve a su posición original
+  const handleEditElement = useCallback((elementId: string) => {
+    const element = elements.find(el => el.id === elementId);
+    if (!element) return;
+
+    // Tipos que siempre deben estar en primera capa (después del tablero)
+    const firstLayerTypes = ['notepad', 'notepad-simple', 'test-notepad', 'tabbed-notepad', 'yellow-notepad'];
+    const isFirstLayer = firstLayerTypes.includes(element.type);
+    
+    // Obtener zIndex actual
+    const elementProps = typeof element.properties === 'object' && element.properties !== null ? element.properties : {};
+    const currentZIndex = elementProps.zIndex ?? element.zIndex ?? 1;
+    
+    // Guardar zIndex original si no está guardado
+    if (!originalZIndexRef.current.has(elementId)) {
+      originalZIndexRef.current.set(elementId, currentZIndex);
+    }
+    
+    // Calcular nuevo zIndex: traer al frente temporalmente
+    const maxZIndex = getNextZIndex();
+    const newZIndex = isFirstLayer 
+      ? Math.max(maxZIndex - 100, 1000) // Primera capa: mínimo 1000
+      : maxZIndex; // Otros elementos: máximo disponible
+    
+    // Actualizar zIndex para traer al frente
+    updateElement(elementId, {
+      properties: {
+        ...elementProps,
+        zIndex: newZIndex,
+      },
+    });
+    
+    // Activar elemento para edición
+    setActivatedElementId(elementId);
+    
+    // Centrar vista en el elemento si está disponible
+    if (canvasRef.current) {
+      canvasRef.current.centerOnElement(element);
+    }
+  }, [elements, getNextZIndex, updateElement]);
+
+  // Restaurar zIndex original cuando se deselecciona un elemento
+  useEffect(() => {
+    if (!activatedElementId && originalZIndexRef.current.size > 0) {
+      // Restaurar zIndex original de todos los elementos editados
+      originalZIndexRef.current.forEach((originalZIndex, elementId) => {
+        const element = elements.find(el => el.id === elementId);
+        if (element) {
+          const elementProps = typeof element.properties === 'object' && element.properties !== null ? element.properties : {};
+          const currentZIndex = elementProps.zIndex ?? element.zIndex ?? 1;
+          
+          // Solo restaurar si el zIndex actual es diferente al original
+          if (currentZIndex !== originalZIndex) {
+            updateElement(elementId, {
+              properties: {
+                ...elementProps,
+                zIndex: originalZIndex,
+              },
+            });
+          }
+        }
+      });
+      
+      // Limpiar el mapa después de restaurar
+      originalZIndexRef.current.clear();
+    }
+  }, [activatedElementId, elements, updateElement]);
+
   // Función para exportar el tablero completo a PNG de alta resolución
   const handleExportBoardToPng = useCallback(async () => {
     try {
@@ -572,12 +645,12 @@ export default function BoardPage({ params }: BoardPageProps) {
       // Ocultar elementos de UI temporalmente para la exportación
       document.body.classList.add('exporting-to-png');
 
-      // Capturar SOLO el área visible del usuario (viewport)
+      // Capturar SOLO el área visible del usuario (viewport) - Usar misma lógica de alta resolución que cuadernos
       const scrollLeft = canvasContainer.scrollLeft;
       const scrollTop = canvasContainer.scrollTop;
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      const scale = 4; // Alta resolución para tablero completo (NO reducir)
+      const viewportWidth = canvasContainer.clientWidth;
+      const viewportHeight = canvasContainer.clientHeight;
+      const scale = 3; // Alta resolución (misma que cuadernos) - captando todos los detalles
       
       // Obtener el rectángulo del contenedor para calcular la posición relativa
       const containerRect = canvasContainer.getBoundingClientRect();
@@ -764,7 +837,7 @@ export default function BoardPage({ params }: BoardPageProps) {
         onLocateElement={handleLocateElement}
         onFormatToggle={handleFormatToggle}
         onChangeNotepadFormat={handleChangeNotepadFormat}
-        onEditElement={setActivatedElementId}
+        onEditElement={handleEditElement}
         
         // Estado
         selectedElement={selectedElement}
